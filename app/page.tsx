@@ -1,101 +1,190 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useRef, useState } from "react";
+import mapboxgl from "mapbox-gl";
+import axios from "axios";
+
+const currentYear = new Date().getFullYear();
+
+const MAPBOX_ACCESS_TOKEN = "pk.eyJ1Ijoibm9haGIyMCIsImEiOiJjbTcybWoyazIwYnd6MnNwdzYyd3VjMG9qIn0.f_TJQWjWjJualT0xPfAjEA";
+// const FLASK_API_URL = "http://127.0.0.1:5000/predict"; // Replace with your Flask API URL if deployed
+const FLASK_API_URL ="https://backend-model-server.onrender.com/predict"
+
+
+//style: "mapbox://styles/mapbox/satellite-streets-v11",
+
+mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+
+const Mapbox = () => {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const [locationData, setLocationData] = useState<{
+    lat?: number;
+    lng?: number;
+    altitude?: number;
+    temperature?: number;
+    humidity?: number;
+    prediction?: number;
+  }>({});
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (map.current || !mapContainer.current) return;
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/noahb20/cm7337ns8008q01qu8p0s0jll",
+      center: [0, 0],
+      zoom: 2,
+    });
+
+    map.current.on("click", async (event) => {
+      setLoading(true);
+      const { lng, lat } = event.lngLat;
+      const data = await fetchWeatherAndElevation(lat, lng);
+      if (data) await fetchPrediction(data);
+      setLoading(false);
+    });
+  }, []);
+
+  const fetchWeatherAndElevation = async (lat: number, lng: number) => {
+    try {
+      const altitude = await getElevation(lat, lng);
+      const weatherResponse = await axios.get(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,relative_humidity_2m&timezone=auto`
+      );
+
+      const hourlyData = weatherResponse.data.hourly;
+      const temperature = hourlyData.temperature_2m[0];
+      const humidity = hourlyData.relative_humidity_2m[0];
+
+      const data = { lat, lng, altitude, temperature, humidity };
+      setLocationData(data);
+      return data;
+    } catch (error) {
+      console.error("Error fetching weather and elevation:", error);
+    }
+  };
+
+  const getElevation = async (lat: number, lng: number): Promise<number> => {
+    try {
+      const response = await axios.get(
+        `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`
+      );
+      return response.data.results[0].elevation || 0;
+    } catch (error) {
+      console.error("Error fetching elevation:", error);
+      return 0;
+    }
+  };
+
+  const fetchPrediction = async (data: {
+    altitude: number;
+    temperature: number;
+    humidity: number;
+  }) => {
+    try {
+      const response = await axios.post(FLASK_API_URL, {
+        altitude: data.altitude,
+        average_temperature: data.temperature,
+        average_humidity: data.humidity,
+      });
+
+      const prediction = response.data.prediction;
+      setLocationData((prev) => prev ? { ...prev, prediction } : null);
+    } catch (error) {
+      console.error("Error fetching prediction:", error);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+        backgroundColor: "#000",
+        color: "#fff",
+      }}
+    >
+      <div
+        style={{
+          width: "25vw",
+          height: "70vh",
+          background: "rgba(50, 50, 50, 0.85)",
+          padding: "20px",
+          borderRadius: "16px",
+          boxShadow: "0px 4px 15px rgba(255, 255, 255, 0.15)",
+          color: "#fff",
+          textAlign: "center",
+          fontFamily: "'SF Pro Display', Arial, sans-serif",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: "10px",
+          marginRight: 25,
+          marginLeft: 10,
+        }}
+      >
+        {loading ? (
+          <div className="flex items-center justify-center">
+            <div className="w-6 h-6 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+          </div>
+        ) : locationData.lat !== undefined && locationData.lng !== undefined ? (
+          <>
+            <div style={{backgroundColor: 'gray', borderRadius: 20, padding: 10}}>
+            <p>Altitude: {locationData.altitude?.toFixed(2)} m</p>
+            <p>Temperature: {locationData.temperature}°C</p>
+            <p>Humidity: {locationData.humidity}%</p>
+            <p>Latitude: {locationData.lat}</p>
+            <p>Longitude: {locationData.lng}</p>
+            </div>
+            <div style={{backgroundColor:'gray', borderRadius: 20, marginTop:10, marginBottom:10}}>
+            <p style={{ fontWeight: 'bold', fontSize: 30, padding: 10 }}>
+              Predicted TTM PUE {new Date().toLocaleDateString()}
+            </p>
+            </div>
+            <div style={{backgroundColor: 'gray', borderRadius: 20}}>
+            {locationData.prediction !== undefined && (
+              <p style={{fontSize: 150}}>{locationData.prediction.toFixed(2)}</p>
+            )}
+            </div>
+          </>
+        ) : (
+          <p>🌍 Select a location on the map</p>
+        )}
+      </div>
+      <div
+        ref={mapContainer}
+        style={{
+          width: "75vw",
+          height: "70vh",
+          borderRadius: "16px",
+          overflow: "hidden",
+          boxShadow: "0px 4px 10px rgba(255, 255, 255, 0.2)",
+          marginRight: 10,
+        }}
+      />
+      {/* Copyright Footer */}
+      <footer
+        style={{
+          width: "100%",
+          textAlign: "center",
+          padding: "10px 0",
+          backgroundColor: "rgba(50, 50, 50, 0.85)",
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          color: "#fff",
+        }}
+      >
+        <p>&copy; {currentYear} NEB Synergy. All Rights Reserved.</p>
       </footer>
     </div>
   );
-}
+};
+
+export default Mapbox;
+
