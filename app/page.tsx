@@ -91,7 +91,8 @@ const Mapbox = () => {
       });
 
       const prediction = response.data.prediction;
-      setLocationData((prev) => prev ? { ...prev, prediction } : null);
+      //setLocationData((prev) => prev ? { ...prev, prediction } : null);
+      setLocationData((prev) => ({ ...(prev || {}), prediction }));
     } catch (error) {
       console.error("Error fetching prediction:", error);
     }
