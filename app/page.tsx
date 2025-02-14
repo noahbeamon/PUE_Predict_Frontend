@@ -44,7 +44,7 @@ const Mapbox = () => {
     });
   }, []);
 
-  const fetchWeatherAndElevation = async (lat, lng) => {
+  const fetchWeatherAndElevation = async (lat: number, lng: number) => {
     try {
       const altitude = await getElevation(lat, lng);
       const weatherResponse = await axios.get(
@@ -63,7 +63,7 @@ const Mapbox = () => {
     }
   };
 
-  const getElevation = async (lat, lng) => {
+  const getElevation = async (lat: number, lng: number) => {
     try {
       const response = await axios.get(
         `https://api.open-elevation.com/api/v1/lookup?locations=${lat},${lng}`
