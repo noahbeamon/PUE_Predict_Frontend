@@ -12,10 +12,20 @@ const FLASK_API_URL = "https://backend-model-server.onrender.com/predict";
 
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
+// Define the type for locationData state
+interface LocationData {
+  lat: number | undefined;
+  lng: number | undefined;
+  altitude: number | undefined;
+  temperature: number | undefined;
+  humidity: number | undefined;
+  prediction: number | undefined;
+}
+
 const Mapbox = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [locationData, setLocationData] = useState({
+  const [locationData, setLocationData] = useState<LocationData>({
     lat: undefined,
     lng: undefined,
     altitude: undefined,
@@ -55,7 +65,8 @@ const Mapbox = () => {
       const temperature = hourlyData.temperature_2m[0];
       const humidity = hourlyData.relative_humidity_2m[0];
 
-      const data = { lat, lng, altitude, temperature, humidity };
+      // Set prediction as undefined initially
+      const data: LocationData = { lat, lng, altitude, temperature, humidity, prediction: undefined };
       setLocationData(data);
       return data;
     } catch (error) {
@@ -75,7 +86,7 @@ const Mapbox = () => {
     }
   };
 
-  const fetchPrediction = async (data) => {
+  const fetchPrediction = async (data: LocationData) => {
     try {
       const response = await axios.post(FLASK_API_URL, {
         altitude: data.altitude,
@@ -124,6 +135,7 @@ const Mapbox = () => {
 };
 
 export default Mapbox;
+
 
 
 // "use client";
